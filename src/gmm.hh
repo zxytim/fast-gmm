@@ -1,6 +1,6 @@
 /*
  * $File: gmm.hh
- * $Date: Tue Dec 10 12:42:53 2013 +0800
+ * $Date: Tue Dec 10 14:33:43 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -14,6 +14,8 @@
 #include <vector>
 #include <algorithm>
 
+
+#define FAST_GAUSSIAN_PROBABILITY
 
 enum CovType {
 	COVTYPE_SPHERICAL,
@@ -41,6 +43,11 @@ class Gaussian {
 		void load(std::istream &in);
 
 		Random random;
+
+#ifdef FAST_GAUSSIAN_PROBABILITY
+		std::vector<real_t> fast_gaussian_buffer;
+		int fast_gaussian_dim;
+#endif
 };
 
 class GMM;
@@ -108,6 +115,7 @@ class GMM {
 		real_t probability_of(std::vector<real_t> &x);
 
 		void normalize_weights();
+
 };
 
 /**

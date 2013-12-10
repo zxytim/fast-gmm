@@ -1,6 +1,6 @@
 /*
  * $File: main.cc
- * $Date: Tue Dec 10 12:50:34 2013 +0800
+ * $Date: Tue Dec 10 14:32:38 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -111,14 +111,30 @@ void write_dense_dataset(DenseDataset &X, const char *fname) {
 	}
 }
 
-void fill_gaussian_2d(DenseDataset &X, Gaussian *gaussian, int nr_point) {
+void fill_gaussian(DenseDataset &X, Gaussian *gaussian, int nr_point) {
 	for (int i = 0; i < nr_point; i ++)
 		X.push_back(gaussian->sample());
 }
 
+static vector<real_t> random_vector(int dim, real_t range, Random &random) {
+	vector<real_t> vec(dim);
+	for (auto &v: vec) v = random.rand_real() * range;
+	return vec;
+}
+
+void gen_high_dim_gaussian_mixture(DenseDataset &X, int dim, int nr_gaussian, int nr_point_per_gaussian) {
+	Random random;
+	for (int i = 0; i < nr_gaussian; i ++) {
+		Gaussian g(dim);
+		g.mean = random_vector(dim, 1, random);
+		g.sigma = random_vector(dim, 0.05 + random.rand_real() * 0.1, random);
+		fill_gaussian(X, &g, nr_point_per_gaussian);
+	}
+}
+
 void gen_gaussian_mixture(DenseDataset &X) {
-	int nr_gaussian = 2;
-	int nr_point_per_gaussian = 100;
+	int nr_gaussian = 3;
+	int nr_point_per_gaussian = 1000;
 	Gaussian g0(2);
 	g0.mean = {0, 0};
 	g0.sigma = {0.1, 0.1};
@@ -131,9 +147,9 @@ void gen_gaussian_mixture(DenseDataset &X) {
 	g2.mean = {2, 1};
 	g2.sigma = {0.2, 0.2};
 
-	fill_gaussian_2d(X, &g0, nr_point_per_gaussian);
-	fill_gaussian_2d(X, &g1, nr_point_per_gaussian);
-	fill_gaussian_2d(X, &g2, nr_point_per_gaussian);
+	fill_gaussian(X, &g0, nr_point_per_gaussian);
+	fill_gaussian(X, &g1, nr_point_per_gaussian);
+	fill_gaussian(X, &g2, nr_point_per_gaussian);
 }
 
 int main(int argc, char *argv[]) {
@@ -142,12 +158,13 @@ int main(int argc, char *argv[]) {
 
 	DenseDataset X;
 //    read_dense_dataset(X, "test.data");
-	gen_gaussian_mixture(X);
+//    gen_gaussian_mixture(X);
+	gen_high_dim_gaussian_mixture(X, 13, 10, 680);
 
-	int nr_mixture = 3;
+	int nr_mixture = 256;
 	write_dense_dataset(X, "test.data");
 
-	GMMTrainerBaseline trainer(1000);
+	GMMTrainerBaseline trainer(1);
 	GMM gmm(nr_mixture, COVTYPE_DIAGONAL, &trainer);
 	gmm.fit(X);
 
