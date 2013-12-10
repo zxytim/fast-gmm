@@ -1,6 +1,6 @@
 /*
  * $File: random.hh
- * $Date: Fri Dec 06 14:29:49 2013 +0800
+ * $Date: Tue Dec 10 12:44:17 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -20,6 +20,7 @@ class Random {
 
 		Random() {
 			long long seed = std::chrono::system_clock::now().time_since_epoch().count();
+//            seed = rand();
 			generator.seed(seed);
 		}
 

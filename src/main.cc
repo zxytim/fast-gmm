@@ -1,6 +1,6 @@
 /*
  * $File: main.cc
- * $Date: Mon Dec 09 00:42:17 2013 +0800
+ * $Date: Tue Dec 10 12:50:34 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -37,7 +37,7 @@ vector<real_t> string_to_double_vector(string line) {
 		while (end < len && line[end] != ' ' && line[end] != '\n')
 			end ++;
 		x.push_back(atof(line.substr(begin, end - begin).c_str()));
-		if (end == len || line[end] == '\n')
+		if (end == len - 1 || line[end] == '\n' || (end == len - 2 && line[end] == ' ' && line[end] == '\n'))
 			break;
 		begin = end + 1;
 		end = begin;
@@ -116,13 +116,7 @@ void fill_gaussian_2d(DenseDataset &X, Gaussian *gaussian, int nr_point) {
 		X.push_back(gaussian->sample());
 }
 
-int main(int argc, char *argv[]) {
-//    srand(42); // Answer to The Ultimate Question of Life, the Universe, and Everything
-//    Args args = parse_args(argc, argv);
-
-	DenseDataset X;
-//    read_dense_dataset(X, args.input_file.c_str());
-
+void gen_gaussian_mixture(DenseDataset &X) {
 	int nr_gaussian = 2;
 	int nr_point_per_gaussian = 100;
 	Gaussian g0(2);
@@ -130,16 +124,31 @@ int main(int argc, char *argv[]) {
 	g0.sigma = {0.1, 0.1};
 
 	Gaussian g1(2);
-	g1.mean = {1, 0};
+	g1.mean = {1, 1};
 	g1.sigma = {0.1, 0.1};
+
+	Gaussian g2(2);
+	g2.mean = {2, 1};
+	g2.sigma = {0.2, 0.2};
 
 	fill_gaussian_2d(X, &g0, nr_point_per_gaussian);
 	fill_gaussian_2d(X, &g1, nr_point_per_gaussian);
+	fill_gaussian_2d(X, &g2, nr_point_per_gaussian);
+}
 
+int main(int argc, char *argv[]) {
+	srand(42); // Answer to The Ultimate Question of Life, the Universe, and Everything
+//    Args args = parse_args(argc, argv);
+
+	DenseDataset X;
+//    read_dense_dataset(X, "test.data");
+	gen_gaussian_mixture(X);
+
+	int nr_mixture = 3;
 	write_dense_dataset(X, "test.data");
 
-	int nr_mixture = 2;
-	GMM gmm(nr_mixture);
+	GMMTrainerBaseline trainer(1000);
+	GMM gmm(nr_mixture, COVTYPE_DIAGONAL, &trainer);
 	gmm.fit(X);
 
 	ofstream fout("gmm-test.model");

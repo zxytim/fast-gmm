@@ -1,6 +1,6 @@
 /*
  * $File: gmm.hh
- * $Date: Mon Dec 09 00:45:03 2013 +0800
+ * $Date: Tue Dec 10 12:42:53 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -70,6 +70,7 @@ class GMMTrainerBaseline : public GMMTrainer {
 		real_t min_covar;
 
 		std::vector<std::vector<real_t>> prob_of_y_given_x; // y, x
+		std::vector<real_t> N_k;
 };
 
 class GMM {
@@ -103,6 +104,10 @@ class GMM {
 
 		real_t log_probability_of(std::vector<real_t> &x, int mixture_id);
 		real_t log_probability_of(std::vector<real_t> &x);
+		real_t log_probability_of(std::vector<std::vector<real_t>> &X);
+		real_t probability_of(std::vector<real_t> &x);
+
+		void normalize_weights();
 };
 
 /**
