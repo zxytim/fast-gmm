@@ -1,12 +1,14 @@
 #
 # $File: Makefile
-# $Date: Tue Dec 10 16:23:54 2013 +0800
+# $Date: Wed Dec 11 00:31:33 2013 +0800
 #
 # A single output portable Makefile for
 # simple c++ project
 
+SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
+LIB_DIR = lib
 TARGET = gmm
 
 CXX = g++
@@ -15,7 +17,7 @@ CXX = g++
 BIN_TARGET = $(BIN_DIR)/$(TARGET)
 PROF_FILE = $(BIN_TARGET).prof
 
-INCLUDE_DIR = -I src
+INCLUDE_DIR = -I $(SRC_DIR)
 #LDFLAGS = -L /home/zhanpeng/.local/lib -lGClasses
 #LDFLAGS += -lprofiler
 #DEFINES += -D__DEBUG
@@ -38,16 +40,26 @@ CXXFLAGS += $(LDFLAGS)
 CXXFLAGS += -lpthread
 #CXXFLAGS += -fopenmp
 
+CXXFLAGS += -fPIC
 
 #CC = /usr/share/clang/scan-build/ccc-analyzer
 #CXX = /usr/share/clang/scan-build/c++-analyzer
-CXXSOURCES = $(shell find src/ -name "*.cc")
+CXXSOURCES = $(shell find $(SRC_DIR)/ -name "*.cc")
 OBJS = $(addprefix $(OBJ_DIR)/,$(CXXSOURCES:.cc=.o))
 DEPFILES = $(OBJS:.o=.d)
 
 .PHONY: all clean run rebuild gdb
 
-all: $(BIN_TARGET)
+all: $(BIN_TARGET) $(LIB_DIR)/pygmm.so
+
+$(LIB_DIR)/pygmm.so: $(OBJS) $(LIB_DIR)
+	g++ -shared $(OBJS) -o $(LIB_DIR)/pygmm.so $(CXXFLAGS)
+
+$(LIB_DIR)/pygmm.o: $(OBJ_DIR)/$(SRC_DIR)/pygmm.o $(LIB_DIR)
+	cp $(OBJ_DIR)/$(SRC_DIR)/pygmm.o $(LIB_DIR)/pygmm.o
+
+$(LIB_DIR):
+	mkdir $(LIB_DIR)
 
 $(OBJ_DIR)/%.o: %.cc
 	@echo "[cc] $< ..."
@@ -67,7 +79,7 @@ $(BIN_TARGET): $(OBJS)
 	@echo have a nice day!
 
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(OBJ_DIR) $(BIN_DIR) $(LIB_DIR)
 
 run: $(BIN_TARGET)
 	./$(BIN_TARGET)

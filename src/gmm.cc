@@ -1,6 +1,6 @@
 /*
  * $File: gmm.cc
- * $Date: Tue Dec 10 16:40:59 2013 +0800
+ * $Date: Tue Dec 10 23:30:21 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -106,7 +106,9 @@ void Gaussian::dump(std::ostream &out) {
 
 void Gaussian::load(std::istream &in) {
 	in >> dim >> covariance_type;
+	mean.resize(dim);
 	for (auto &m: mean) in >> m;
+	fast_gaussian_dim = (int)(ceil(dim / 4.0) * 4);
 
 	// input sigma
 	switch (covariance_type) {
@@ -114,10 +116,13 @@ void Gaussian::load(std::istream &in) {
 			throw "COVTYPE_SPHERICAL not implemented";
 			break;
 		case COVTYPE_DIAGONAL:
+			sigma.resize(dim);
 			for (auto &s: sigma) in >> s;
 			break;
 		case COVTYPE_FULL:
+			covariance.resize(dim);
 			for (auto &row: covariance) {
+				row.resize(dim);
 				for (auto &v: row)
 					in >> v;
 			}
@@ -189,6 +194,11 @@ GMM::GMM(int nr_mixtures, int covariance_type,
 		printf("%s\n", msg);
 		throw msg;
 	}
+}
+
+GMM::GMM(const std::string &model_file) {
+	ifstream fin(model_file);
+	this->load(fin);
 }
 
 GMM::~GMM() {
@@ -575,6 +585,7 @@ void GMM::dump(ostream &out) {
 
 void GMM::load(istream &in) {
 	in >> nr_mixtures;
+	weights.resize(nr_mixtures);
 	for (auto &w: weights)
 		in >> w;
 	for (auto &g: gaussians)

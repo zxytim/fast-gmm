@@ -1,6 +1,6 @@
 /*
  * $File: gmm.hh
- * $Date: Tue Dec 10 16:13:02 2013 +0800
+ * $Date: Tue Dec 10 23:26:27 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -80,6 +80,7 @@ class GMM {
 	public:
 		GMM(int nr_mixtures, int covariance_type = COVTYPE_DIAGONAL,
 				GMMTrainer *trainer = NULL);
+		GMM(const std::string &model_file);
 		~GMM();
 
 		template<class Instance>
