@@ -1,6 +1,6 @@
 /*
  * $File: timer.hh
- * $Date: Tue Dec 10 14:01:14 2013 +0800
+ * $Date: Tue Dec 10 16:44:35 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -38,8 +38,10 @@ class GuardedTimer {
 				timer.start();
 			}
 		~GuardedTimer() {
-			if (enable)
+			if (enable) {
 				printf("%s: %.3lfs\n", prompt.c_str(), timer.stop() / 1000.0);
+				fflush(stdout);
+			}
 		}
 
 };

@@ -1,7 +1,7 @@
 #!/usr/bin/python2
 # -*- coding: utf-8 -*-
 # $File: plot-gmm.py
-# $Date: Tue Dec 10 12:45:04 2013 +0800
+# $Date: Tue Dec 10 16:14:53 2013 +0800
 # $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
 
 import matplotlib.pyplot as plt
@@ -98,7 +98,7 @@ def main():
         Z += get_Z(X, Y, gaussian)
     plt.contour(X, Y, Z, cmap=cm.PuBu_r)
     for gaussian in gmm.gaussians:
-        print gaussian.mean
+#        print gaussian.mean
         plt.scatter(gaussian.mean[0], gaussian.mean[1], s = 50, c = 'yellow')
 
     plt.show()

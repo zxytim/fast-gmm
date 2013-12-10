@@ -1,6 +1,6 @@
 /*
  * $File: main.cc
- * $Date: Tue Dec 10 14:32:38 2013 +0800
+ * $Date: Tue Dec 10 16:43:56 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -132,9 +132,8 @@ void gen_high_dim_gaussian_mixture(DenseDataset &X, int dim, int nr_gaussian, in
 	}
 }
 
-void gen_gaussian_mixture(DenseDataset &X) {
+void gen_gaussian_mixture(DenseDataset &X, int nr_point_per_gaussian = 1000) {
 	int nr_gaussian = 3;
-	int nr_point_per_gaussian = 1000;
 	Gaussian g0(2);
 	g0.mean = {0, 0};
 	g0.sigma = {0.1, 0.1};
@@ -158,14 +157,18 @@ int main(int argc, char *argv[]) {
 
 	DenseDataset X;
 //    read_dense_dataset(X, "test.data");
-//    gen_gaussian_mixture(X);
-	gen_high_dim_gaussian_mixture(X, 13, 10, 680);
+	gen_gaussian_mixture(X, 100);
+//    gen_high_dim_gaussian_mixture(X, 13, 10, 68000);
 
-	int nr_mixture = 256;
 	write_dense_dataset(X, "test.data");
 
-	GMMTrainerBaseline trainer(1);
+
+	int concurrency = 4;
+	int nr_mixture = 3;
+
+	GMMTrainerBaseline trainer(1, 1e-3, concurrency);
 	GMM gmm(nr_mixture, COVTYPE_DIAGONAL, &trainer);
+	printf("start training ...\n"); fflush(stdout);
 	gmm.fit(X);
 
 	ofstream fout("gmm-test.model");

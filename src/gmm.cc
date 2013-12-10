@@ -1,11 +1,12 @@
 /*
  * $File: gmm.cc
- * $Date: Tue Dec 10 14:31:43 2013 +0800
+ * $Date: Tue Dec 10 16:40:59 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
 #include "gmm.hh"
 #include "timer.hh"
+#include "Threadpool/Threadpool.hpp"
 
 #include <cassert>
 #include <fstream>
@@ -13,6 +14,7 @@
 
 
 using namespace std;
+using namespace ThreadLib;
 
 static const real_t SQRT_2_PI = 2.5066282746310002;
 
@@ -30,10 +32,7 @@ Gaussian::Gaussian(int dim, int covariance_type) :
 	sigma.resize(dim);
 	mean.resize(dim);
 
-#ifdef FAST_GAUSSIAN_PROBABILITY
 	fast_gaussian_dim = (int)(ceil(dim / 4.0) * 4);
-	fast_gaussian_buffer.resize(fast_gaussian_dim);
-#endif
 }
 
 void Gaussian::sample(std::vector<real_t> &x) {
@@ -136,29 +135,40 @@ real_t Gaussian::probability_of(std::vector<real_t> &x) {
 			throw "COVTYPE_SPHERICAL not implemented";
 			break;
 		case COVTYPE_DIAGONAL:
-#ifdef FAST_GAUSSIAN_PROBABILITY
-#pragma message "using FAST_GAUSSIAN_PROBABILITY"
-			{
-				double *buffer = fast_gaussian_buffer.data();
 				for (int i = 0; i < dim; i ++) {
 					real_t &s = sigma[i];
 					real_t d = x[i] - mean[i];
-					buffer[i] = - d * d / (2 * s * s);
-				}
-				array_exp(buffer, fast_gaussian_dim);
-				for (int i = 0; i < dim; i ++) {
-					real_t p = buffer[i] / (SQRT_2_PI * sigma[i]);
+					real_t p = exp(- d * d / (2 * s * s)) / (SQRT_2_PI * s);
 					prob *= p;
 				}
-			}
-#else
+			break;
+		case COVTYPE_FULL:
+			throw "COVTYPE_FULL not implemented";
+			break;
+	}
+	return prob;
+}
+
+real_t Gaussian::probability_of_fast_exp(std::vector<real_t> &x, double *buffer) {
+	assert((int)x.size() == dim);
+
+	real_t prob = 1.0;
+	switch (covariance_type) {
+		case COVTYPE_SPHERICAL:
+			throw "COVTYPE_SPHERICAL not implemented";
+			break;
+		case COVTYPE_DIAGONAL:
+			assert(buffer != NULL);
 			for (int i = 0; i < dim; i ++) {
 				real_t &s = sigma[i];
 				real_t d = x[i] - mean[i];
-				real_t p = exp(- d * d / (2 * s * s)) / (SQRT_2_PI * s);
+				buffer[i] = - d * d / (2 * s * s);
+			}
+			array_exp(buffer, fast_gaussian_dim);
+			for (int i = 0; i < dim; i ++) {
+				real_t p = buffer[i] / (SQRT_2_PI * sigma[i]);
 				prob *= p;
 			}
-#endif
 			break;
 		case COVTYPE_FULL:
 			throw "COVTYPE_FULL not implemented";
@@ -181,15 +191,25 @@ GMM::GMM(int nr_mixtures, int covariance_type,
 	}
 }
 
-real_t GMM::log_probability_of(std::vector<real_t> &x, int mixture_id) {
-	assert(mixture_id >= 0 && mixture_id < (int)gaussians.size());
-	return gaussians[mixture_id]->log_probability_of(x);
+GMM::~GMM() {
+	for (auto &g: gaussians)
+		delete g;
 }
+
 
 real_t GMM::log_probability_of(std::vector<real_t> &x) {
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
 		prob += weights[i] * gaussians[i]->probability_of(x);
+	}
+	return log(prob);
+}
+
+real_t GMM::log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer) {
+
+	real_t prob = 0;
+	for (int i = 0; i < nr_mixtures; i ++) {
+		prob += weights[i] * gaussians[i]->probability_of_fast_exp(x, buffer);
 	}
 	return log(prob);
 }
@@ -202,10 +222,19 @@ real_t GMM::probability_of(std::vector<real_t> &x) {
 	return prob;
 }
 
+// time consuming
 real_t GMM::log_probability_of(std::vector<std::vector<real_t>> &X) {
 	real_t prob = 0;
 	for (auto &x: X)
 		prob += log_probability_of(x);
+	return prob;
+}
+
+real_t GMM::log_probability_of_fast_exp(std::vector<std::vector<real_t>> &X, double *buffer) {
+	assert(buffer != NULL);
+	real_t prob = 0;
+	for (auto &x: X)
+		prob += log_probability_of_fast_exp(x, buffer);
 	return prob;
 }
 
@@ -265,8 +294,9 @@ static void mult_self(vector<real_t> &a, real_t f) {
 	mult(a, f, a);
 }
 
-GMMTrainerBaseline::GMMTrainerBaseline(int nr_iter, real_t min_covar) :
-	nr_iter(nr_iter), min_covar(min_covar) {
+GMMTrainerBaseline::GMMTrainerBaseline(int nr_iter, real_t min_covar,
+		int concurrency) :
+	nr_iter(nr_iter), min_covar(min_covar), concurrency(concurrency) {
 }
 
 
@@ -293,11 +323,10 @@ void GMMTrainerBaseline::init_gaussians(std::vector<std::vector<real_t>> &X) {
 
 	gmm->gaussians.resize(gmm->nr_mixtures);
 	for (auto &g: gmm->gaussians) {
-		g = new Gaussian(dim);
+		g = new Gaussian(dim, gmm->covariance_type);
 		g->mean = X[random.rand_int(X.size())];
 		g->sigma = initial_sigma;
 	}
-
 
 	gmm->weights.resize(gmm->nr_mixtures);
 	for (auto &w: gmm->weights)
@@ -333,12 +362,40 @@ static void gassian_set_zero(Gaussian *gaussian) {
 void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
 	int n = (int)X.size();
 
-	bool enable_guarded_timer = false;
+	bool enable_guarded_timer = true;
 	{
 		GuardedTimer timer("calculate probability of y given x", enable_guarded_timer);
-		for (int k = 0; k < gmm->nr_mixtures; k ++)
-			for (int i = 0; i < n; i ++)
-				prob_of_y_given_x[k][i] = gmm->weights[k] * gmm->gaussians[k]->probability_of(X[i]);
+
+		double **buffers = NULL;
+		int batch_size = (int)ceil(gmm->nr_mixtures / (double)concurrency);
+		int nr_batch = gmm->nr_mixtures; //(int)ceil(gmm->nr_mixtures / (double)batch_size)
+		buffers = new double *[nr_batch];
+		for (int i = 0; i < nr_batch; i ++)
+			buffers[i] = new double[gmm->gaussians[0]->fast_gaussian_dim];
+
+		{
+			Threadpool pool(concurrency);
+			for (int k = 0, bid = 0; k < gmm->nr_mixtures; k += batch_size, bid ++) {
+				assert(bid < nr_batch);
+				auto task = [&](int begin, int end, int bid){
+					double *buffer = NULL;
+					buffer = buffers[bid];
+					for (int k = begin; k < end; k ++) {
+						for (int i = 0; i < n; i ++) {
+							real_t pdf_x;
+							pdf_x = gmm->gaussians[k]->probability_of_fast_exp(X[i], buffer);
+							prob_of_y_given_x[k][i] = gmm->weights[k] * pdf_x;
+						}
+					}
+				};
+				pool.enqueue(bind(task, k, min(k + batch_size, gmm->nr_mixtures), bid), 1);
+			}
+		}
+		if (buffers) {
+			for (int i = 0; i < nr_batch; i ++)
+				delete [] buffers[i];
+			delete [] buffers;
+		}
 	}
 
 	{
@@ -372,38 +429,86 @@ void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
 			gmm->weights[k] = N_k[k] / n;
 
 	}
-	vector<real_t> tmp(dim);
 	{
 		GuardedTimer timer("update mean", enable_guarded_timer);
-		for (int k = 0; k < gmm->nr_mixtures; k ++) {
-			auto &gaussian = gmm->gaussians[k];
-			for (int i = 0; i < n; i ++) {
-				mult(X[i], prob_of_y_given_x[k][i], tmp);
-				add_self(gaussian->mean, tmp);
+		{
+			Threadpool pool(concurrency);
+			for (int k = 0; k < gmm->nr_mixtures; k ++) {
+				auto task = [&](int k) {
+					vector<real_t> tmp(dim);
+					auto &gaussian = gmm->gaussians[k];
+					for (int i = 0; i < n; i ++) {
+						mult(X[i], prob_of_y_given_x[k][i], tmp);
+						add_self(gaussian->mean, tmp);
+					}
+					mult_self(gaussian->mean, 1.0 / N_k[k]);
+				};
+				pool.enqueue(bind(task, k), 1);
 			}
-			mult_self(gaussian->mean, 1.0 / N_k[k]);
 		}
 	}
 
 	{
 		GuardedTimer timer("update sigma", enable_guarded_timer);
-		for (int k = 0; k < gmm->nr_mixtures; k ++) {
-			auto &gaussian = gmm->gaussians[k];
-			for (int i = 0; i < n; i ++) {
-				sub(X[i], gaussian->mean, tmp);
-				for (auto &t: tmp) t = t * t;
-				mult_self(tmp, prob_of_y_given_x[k][i]);
-				add_self(gaussian->sigma, tmp);
-			}
-			mult_self(gaussian->sigma, 1.0 / N_k[k]);
-			for (auto &s: gaussian->sigma) {
-				s = sqrt(s);
-				s = max(sqrt(min_covar), s);
+		{
+			Threadpool pool(concurrency);
+			for (int k = 0; k < gmm->nr_mixtures; k ++) {
+				auto task = [&](int k) {
+					vector<real_t> tmp(dim);
+					auto &gaussian = gmm->gaussians[k];
+					for (int i = 0; i < n; i ++) {
+						sub(X[i], gaussian->mean, tmp);
+						for (auto &t: tmp) t = t * t;
+						mult_self(tmp, prob_of_y_given_x[k][i]);
+						add_self(gaussian->sigma, tmp);
+					}
+					mult_self(gaussian->sigma, 1.0 / N_k[k]);
+					for (auto &s: gaussian->sigma) {
+						s = sqrt(s);
+						s = max(sqrt(min_covar), s);
+					}
+				};
+				pool.enqueue(bind(task, k), 1);
 			}
 		}
 	}
 
 }
+
+static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, int concurrency) {
+	real_t prob = 0;
+	int n = (int)X.size();
+	vector<real_t> prob_buffer(n);
+	int batch_size = (int)ceil(n / (real_t)concurrency);
+
+	int nr_batch = (int)ceil(n / (double)batch_size) ;
+	double **buffers = new double *[nr_batch];
+	for (int i = 0; i < nr_batch; i ++)
+		buffers[i] = new double[gmm->gaussians[0]->fast_gaussian_dim];
+
+	{
+		Threadpool pool(concurrency);
+
+		for (int i = 0, id = 0; i < n; i += batch_size, id ++) {
+			auto task = [&](int begin, int end, double *buffer){
+				for (int j = begin; j < end; j ++) {
+					prob_buffer[j] = gmm->log_probability_of_fast_exp(X[j], buffer);
+				}
+			};
+			pool.enqueue(bind(task, i, min(i + batch_size, n), buffers[id]), 1);
+		}
+
+	}
+
+	for (int i = 0; i < nr_batch; i ++)
+		delete [] buffers[i];
+	delete [] buffers;
+
+	for (auto &p: prob_buffer)
+		prob += p;
+	return prob;
+}
+
 
 void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
 	if (X.size() == 0) {
@@ -414,7 +519,7 @@ void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
 
 	this->gmm = gmm;
 
-	dim = X[0].size();
+	gmm->dim = dim = X[0].size();
 
 	prob_of_y_given_x.resize(gmm->nr_mixtures);
 	for (auto &v: prob_of_y_given_x)
@@ -436,6 +541,7 @@ void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
 
 	real_t last_ll = -numeric_limits<real_t>::max();
 	for (int i = 0; i < nr_iter; i ++) {
+		GuardedTimer iter_time("iteration total time");
 		Timer timer;
 		timer.start();
 		iteration(X);
@@ -443,7 +549,9 @@ void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
 
 		// monitor average log likelihood
 		timer.start();
-		real_t ll = gmm->log_probability_of(X);
+		real_t ll;
+		//        ll = gmm->log_probability_of(X);
+		ll = threaded_log_probability_of(gmm, X, this->concurrency);
 		printf("log_probability_of time: %.3lfs\n", timer.stop() / 1000.0);
 		printf("iter %d: ll %lf\n", i, ll);
 

@@ -1,6 +1,6 @@
 /*
  * $File: gmm.hh
- * $Date: Tue Dec 10 14:33:43 2013 +0800
+ * $Date: Tue Dec 10 16:13:02 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -14,8 +14,6 @@
 #include <vector>
 #include <algorithm>
 
-
-#define FAST_GAUSSIAN_PROBABILITY
 
 enum CovType {
 	COVTYPE_SPHERICAL,
@@ -34,6 +32,7 @@ class Gaussian {
 
 		real_t log_probability_of(std::vector<real_t> &x);
 		real_t probability_of(std::vector<real_t> &x);
+		real_t probability_of_fast_exp(std::vector<real_t> &x, double *buffer = NULL);
 
 		// sample a point to @x
 		void sample(std::vector<real_t> &x);
@@ -43,11 +42,7 @@ class Gaussian {
 		void load(std::istream &in);
 
 		Random random;
-
-#ifdef FAST_GAUSSIAN_PROBABILITY
-		std::vector<real_t> fast_gaussian_buffer;
 		int fast_gaussian_dim;
-#endif
 };
 
 class GMM;
@@ -59,7 +54,7 @@ class GMMTrainer {
 
 class GMMTrainerBaseline : public GMMTrainer {
 	public:
-		GMMTrainerBaseline(int nr_iter = 10, real_t min_covar = 1e-3);
+		GMMTrainerBaseline(int nr_iter = 10, real_t min_covar = 1e-3, int concurrency = 1);
 		virtual void train(GMM *gmm, std::vector<std::vector<real_t>> &X);
 		void clear_gaussians();
 
@@ -75,6 +70,7 @@ class GMMTrainerBaseline : public GMMTrainer {
 
 		int nr_iter;
 		real_t min_covar;
+		int concurrency;
 
 		std::vector<std::vector<real_t>> prob_of_y_given_x; // y, x
 		std::vector<real_t> N_k;
@@ -84,6 +80,7 @@ class GMM {
 	public:
 		GMM(int nr_mixtures, int covariance_type = COVTYPE_DIAGONAL,
 				GMMTrainer *trainer = NULL);
+		~GMM();
 
 		template<class Instance>
 			void fit(std::vector<Instance> &X) {
@@ -109,9 +106,13 @@ class GMM {
 		std::vector<real_t> weights;
 		std::vector<Gaussian *> gaussians;
 
-		real_t log_probability_of(std::vector<real_t> &x, int mixture_id);
 		real_t log_probability_of(std::vector<real_t> &x);
 		real_t log_probability_of(std::vector<std::vector<real_t>> &X);
+
+		real_t log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer = NULL);
+		real_t log_probability_of_fast_exp(std::vector<std::vector<real_t>> &X, double *buffer = NULL);
+
+
 		real_t probability_of(std::vector<real_t> &x);
 
 		void normalize_weights();
