@@ -1,6 +1,6 @@
 /*
  * $File: main.cc
- * $Date: Tue Dec 10 18:20:51 2013 +0800
+ * $Date: Wed Dec 11 12:28:33 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -101,6 +101,8 @@ void write_dense_dataset(DenseDataset &X, const char *fname) {
 }
 
 int main(int argc, char *argv[]) {
+	GMM test("python/gmm.model");
+	return 0;
 //    srand(42); // Answer to The Ultimate Question of Life, the Universe, and Everything
 	Args args = parse_args(argc, argv);
 

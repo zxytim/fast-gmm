@@ -1,6 +1,6 @@
 /*
  * $File: gmm.cc
- * $Date: Tue Dec 10 23:30:21 2013 +0800
+ * $Date: Wed Dec 11 13:26:04 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -305,8 +305,9 @@ static void mult_self(vector<real_t> &a, real_t f) {
 }
 
 GMMTrainerBaseline::GMMTrainerBaseline(int nr_iter, real_t min_covar,
-		int concurrency) :
-	nr_iter(nr_iter), min_covar(min_covar), concurrency(concurrency) {
+		int concurrency, int verbosity) :
+	nr_iter(nr_iter), min_covar(min_covar), concurrency(concurrency),
+	verbosity(verbosity) {
 }
 
 
@@ -372,7 +373,7 @@ static void gassian_set_zero(Gaussian *gaussian) {
 void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
 	int n = (int)X.size();
 
-	bool enable_guarded_timer = true;
+	bool enable_guarded_timer = verbosity >= 2;
 	{
 		GuardedTimer timer("calculate probability of y given x", enable_guarded_timer);
 
@@ -485,10 +486,9 @@ void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
 
 }
 
-static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, int concurrency) {
-	real_t prob = 0;
+static void threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_buffer, int concurrency) {
 	int n = (int)X.size();
-	vector<real_t> prob_buffer(n);
+	prob_buffer.resize(n);
 	int batch_size = (int)ceil(n / (real_t)concurrency);
 
 	int nr_batch = (int)ceil(n / (double)batch_size) ;
@@ -513,10 +513,24 @@ static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real
 	for (int i = 0; i < nr_batch; i ++)
 		delete [] buffers[i];
 	delete [] buffers;
+}
 
+static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, int concurrency) {
+	std::vector<real_t> prob_buffer;
+	threaded_log_probability_of(gmm, X, prob_buffer, concurrency);
+	real_t prob = 0;
 	for (auto &p: prob_buffer)
 		prob += p;
 	return prob;
+}
+
+real_t GMM::log_probability_of_fast_exp_threaded(std::vector<std::vector<real_t>> &X, int concurrency) {
+	return threaded_log_probability_of(this, X, concurrency);
+}
+
+void GMM::log_probability_of_fast_exp_threaded(
+		std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency) {
+	threaded_log_probability_of(this, X, prob_out, concurrency);
 }
 
 
@@ -551,23 +565,29 @@ void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
 
 	real_t last_ll = -numeric_limits<real_t>::max();
 	for (int i = 0; i < nr_iter; i ++) {
-		GuardedTimer iter_time("iteration total time");
+		GuardedTimer iter_time("iteration total time", verbosity);
 		Timer timer;
 		timer.start();
 		iteration(X);
-		printf("iteration time: %.3lfs\n", timer.stop() / 1000.0);
+		if (verbosity >= 1)
+			printf("iteration time: %.3lfs\n", timer.stop() / 1000.0);
 
+		if (i % 2 == 0)
+			continue;
 		// monitor average log likelihood
 		timer.start();
 		real_t ll;
 		//        ll = gmm->log_probability_of(X);
 		ll = threaded_log_probability_of(gmm, X, this->concurrency);
-		printf("log_probability_of time: %.3lfs\n", timer.stop() / 1000.0);
-		printf("iter %d: ll %lf\n", i, ll);
+		if (verbosity >= 1)
+			printf("log_probability_of time: %.3lfs\n", timer.stop() / 1000.0);
+		if (verbosity >= 1)
+			printf("iter %d: ll %lf\n", i, ll);
 
 		real_t ll_diff = ll - last_ll;
 		if (fabs(ll_diff) / fabs(ll) < 1e-8 && ll_diff < 1e-8) {
-			printf("too small log likelihood increment, abort iteration.\n");
+			if (verbosity >= 1)
+				printf("too small log likelihood increment, abort iteration.\n");
 			break;
 		}
 		last_ll = ll;
@@ -588,8 +608,11 @@ void GMM::load(istream &in) {
 	weights.resize(nr_mixtures);
 	for (auto &w: weights)
 		in >> w;
-	for (auto &g: gaussians)
+	gaussians.resize(nr_mixtures);
+	for (auto &g: gaussians) {
+		g = new Gaussian(dim, COVTYPE_DIAGONAL);
 		g->load(in);
+	}
 }
 
 /**

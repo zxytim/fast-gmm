@@ -1,6 +1,6 @@
 /*
  * $File: gmm.hh
- * $Date: Tue Dec 10 23:26:27 2013 +0800
+ * $Date: Wed Dec 11 13:24:50 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -54,7 +54,8 @@ class GMMTrainer {
 
 class GMMTrainerBaseline : public GMMTrainer {
 	public:
-		GMMTrainerBaseline(int nr_iter = 10, real_t min_covar = 1e-3, int concurrency = 1);
+		GMMTrainerBaseline(int nr_iter = 10, real_t min_covar = 1e-3, int concurrency = 1,
+				int verbosity = 0);
 		virtual void train(GMM *gmm, std::vector<std::vector<real_t>> &X);
 		void clear_gaussians();
 
@@ -71,6 +72,7 @@ class GMMTrainerBaseline : public GMMTrainer {
 		int nr_iter;
 		real_t min_covar;
 		int concurrency;
+		int verbosity;
 
 		std::vector<std::vector<real_t>> prob_of_y_given_x; // y, x
 		std::vector<real_t> N_k;
@@ -112,6 +114,9 @@ class GMM {
 
 		real_t log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer = NULL);
 		real_t log_probability_of_fast_exp(std::vector<std::vector<real_t>> &X, double *buffer = NULL);
+		real_t log_probability_of_fast_exp_threaded(std::vector<std::vector<real_t>> &X, int concurrency);
+		void log_probability_of_fast_exp_threaded(
+				std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency);
 
 
 		real_t probability_of(std::vector<real_t> &x);

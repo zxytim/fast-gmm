@@ -1,6 +1,6 @@
 /*
  * $File: pygmm.cc
- * $Date: Wed Dec 11 00:40:11 2013 +0800
+ * $Date: Wed Dec 11 13:27:44 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
@@ -13,36 +13,79 @@ using namespace std;
 
 typedef vector<vector<real_t>> DenseDataset;
 
-void conv_double_pp_to_vv(double **Xp, DenseDataset &X, Parameter *param) {
-	X.resize(param->nr_instance);
+void conv_double_pp_to_vv(double **Xp, DenseDataset &X, int nr_instance, int nr_dim) {
+	X.resize(nr_instance);
 	for (auto &x: X)
-		x.resize(param->nr_dim);
-	for (int i = 0; i < param->nr_instance; i ++)
-		for (int j = 0; j < param->nr_dim; j ++)
+		x.resize(nr_dim);
+	for (int i = 0; i < nr_instance; i ++)
+		for (int j = 0; j < nr_dim; j ++)
 			X[i][j] = Xp[i][j];
 }
 
-void train_model(const char *model_file_to_write,
-		double **X_in, Parameter *param) {
+void conv_double_p_to_v(double *x_in, vector<real_t> &x, int nr_dim) {
+	x.resize(nr_dim);
+	for (int i = 0; i < nr_dim; i ++)
+		x[i] = x_in[i];
+}
+
+void print_param(Parameter *param) {
+	printf("nr_instance   :   %d\n", param->nr_instance);
+	printf("nr_dim        :   %d\n", param->nr_dim);
+	printf("nr_mixture    :   %d\n", param->nr_mixture);
+	printf("min_covar     :   %f\n", param->min_covar);
+	printf("nr_iteration  :   %d\n", param->nr_iteration);
+	printf("concurrency   :   %d\n", param->concurrency);
+}
+
+void print_X(double **X) {
+	printf("X: %p\n", X);
+	printf("X: %p\n", X[0]);
+	printf("X: %f\n", X[0][0]);
+}
+
+
+GMM *new_gmm(int nr_mixture, int covariance_type) {
+	return new GMM(nr_mixture, covariance_type);
+}
+
+GMM *load(const char *model_file) {
+	return new GMM(model_file);
+}
+
+void dump(GMM *gmm, const char *model_file) {
+	ofstream fout(model_file);
+	gmm->dump(fout);
+}
+
+void train_model(GMM *gmm, double **X_in, Parameter *param) {
+//    print_param(param);
 	GMMTrainerBaseline trainer(param->nr_iteration, param->min_covar, param->concurrency);
-	GMM gmm(param->nr_mixture, COVTYPE_DIAGONAL, &trainer);
+	gmm->trainer = &trainer;
 	DenseDataset X;
-	conv_double_pp_to_vv(X_in, X, param);
-	gmm.fit(X);
-
-	ofstream fout(model_file_to_write);
-	gmm.dump(fout);
+	conv_double_pp_to_vv(X_in, X, param->nr_instance, param->nr_dim);
+	gmm->fit(X);
 }
 
-double score(const char *model_file_to_load, double **X_in, Parameter *param) {
-	GMM gmm(model_file_to_load);
+double score_all(GMM *gmm, double **X_in, int nr_instance, int nr_dim, int concurrency) {
 	DenseDataset X;
-	conv_double_pp_to_vv(X_in, X, param);
-	double *buffer = new double [gmm.gaussians[0]->fast_gaussian_dim];
-	return gmm.log_probability_of_fast_exp(X, buffer);
+	conv_double_pp_to_vv(X_in, X, nr_instance, nr_dim);
+	return gmm->log_probability_of_fast_exp_threaded(X, concurrency);
 }
 
+void score_batch(GMM *gmm, double **X_in, double *prob_out, int nr_instance, int nr_dim, int concurrency) {
+	DenseDataset X;
+	conv_double_pp_to_vv(X_in, X, nr_instance, nr_dim);
+	std::vector<real_t> prob;
+	gmm->log_probability_of_fast_exp_threaded(X, prob, concurrency);
+	for (size_t i = 0; i < prob.size(); i ++)
+		prob_out[i] = prob[i];
+}
 
+double score_instance(GMM *gmm, double *x_in, int nr_dim) {
+	vector<real_t> x;
+	conv_double_p_to_v(x_in, x, nr_dim);
+	return gmm->log_probability_of_fast_exp(x);
+}
 
 /**
  * vim: syntax=cpp11 foldmethod=marker

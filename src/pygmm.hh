@@ -1,10 +1,12 @@
 /*
  * $File: pygmm.hh
- * $Date: Wed Dec 11 00:40:21 2013 +0800
+ * $Date: Wed Dec 11 13:17:34 2013 +0800
  * $Author: Xinyu Zhou <zxytim[at]gmail[dot]com>
  */
 
 #pragma once
+
+#include "gmm.hh"
 
 extern "C" {
 struct Parameter {
@@ -18,11 +20,16 @@ struct Parameter {
 	int concurrency;
 };
 
-void train_model(const char *model_file_to_write, double **X, Parameter *param);
+GMM *new_gmm(int nr_mixture, int covariance_type);
+GMM *load(const char *model_file);
 
-// only nr_instances and nr_dim are used
-double score(const char *model_file_to_load, double **X, Parameter *param);
+void dump(GMM *gmm, const char *model_file);
 
+void train_model(GMM *gmm, double **X_in, Parameter *param);
+
+double score_all(GMM *gmm, double **X_in, int nr_instance, int nr_dim, int concurrency);
+void score_batch(GMM *gmm, double **X_in, double *prob_out, int nr_instance, int nr_dim, int concurrency);
+double score_instance(GMM *gmm, double *x_in, int nr_dim);
 }
 
 /**
