@@ -679,7 +679,7 @@ void GMMTrainerBaseline::train(GMM *gmm, const std::vector<std::vector<real_t>> 
 }
 
 void GMM::dump(ostream &out) {
-	out << nr_mixtures << endl;
+	out << nr_mixtures << ' ' << dim << ' ' << covariance_type << endl;
 	for (auto &w: weights)
 		out << w << ' ';
 	out << endl;
@@ -688,13 +688,13 @@ void GMM::dump(ostream &out) {
 }
 
 void GMM::load(istream &in) {
-	in >> nr_mixtures;
+	in >> nr_mixtures >> dim >> covariance_type;
 	weights.resize(nr_mixtures);
 	for (auto &w: weights)
 		in >> w;
 	gaussians.resize(nr_mixtures);
 	for (auto &g: gaussians) {
-		g = new Gaussian(dim, COVTYPE_DIAGONAL);
+		g = new Gaussian(dim, covariance_type);
 		g->load(in);
 	}
 }
