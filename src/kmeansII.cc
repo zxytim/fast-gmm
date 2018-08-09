@@ -87,7 +87,7 @@ real_t KMeansIISolver::cluster(const Dataset &dataset, std::vector<Vector> &cent
 	for (auto &p: centroids_param)
 		p.resize(m);
 
-	printf("kmeansII initializing ...\n");
+	//printf("kmeansII initializing ...\n");
 
 	// initial cluster with one random point
 	std::vector<Vector> centroids(1, centroids_param[0]);
@@ -142,8 +142,8 @@ real_t KMeansIISolver::cluster(const Dataset &dataset, std::vector<Vector> &cent
 				}
 			}
 
-			printf("kmeansII iteration %3d: %f, #new: %lu, #all: %lu\n",
-					iter_id, distsqr_sum, centroids.size() - last_size, centroids.size());
+			/*printf("kmeansII iteration %3d: %f, #new: %lu, #all: %lu\n",
+					iter_id, distsqr_sum, centroids.size() - last_size, centroids.size());*/
 			fflush(stdout);
 
 			if (centroids.size() - last_size == 0)
