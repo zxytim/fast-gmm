@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <Eigen/Dense>
 
 
 enum CovType {
@@ -28,12 +29,14 @@ class Gaussian {
 		int dim, covariance_type;
 		std::vector<real_t> mean;
 		std::vector<real_t> sigma;
-		std::vector<std::vector<real_t>> covariance; // not used
+
 
 		real_t log_probability_of(const std::vector<real_t> &x);
 		real_t probability_of(const std::vector<real_t> &x);
 		real_t probability_of_fast_exp(const std::vector<real_t> &x, double *buffer = NULL);
 		real_t mahalanobis_of(const std::vector<real_t> &x);
+
+		void setCovariance(const Eigen::MatrixXd& covariance);
 
 		// sample a point to @x
 		void sample(std::vector<real_t> &x);
@@ -44,6 +47,11 @@ class Gaussian {
 
 		Random random;
 		int fast_gaussian_dim;
+
+	private:
+		Eigen::MatrixXd covariance;
+		double det_covariance;
+		Eigen::MatrixXd inv_covariance;
 };
 
 class GMM;
