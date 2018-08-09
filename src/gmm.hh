@@ -30,9 +30,9 @@ class Gaussian {
 		std::vector<real_t> sigma;
 		std::vector<std::vector<real_t>> covariance; // not used
 
-		real_t log_probability_of(std::vector<real_t> &x);
-		real_t probability_of(std::vector<real_t> &x);
-		real_t probability_of_fast_exp(std::vector<real_t> &x, double *buffer = NULL);
+		real_t log_probability_of(const std::vector<real_t> &x);
+		real_t probability_of(const std::vector<real_t> &x);
+		real_t probability_of_fast_exp(const std::vector<real_t> &x, double *buffer = NULL);
 
 		// sample a point to @x
 		void sample(std::vector<real_t> &x);
@@ -48,7 +48,7 @@ class Gaussian {
 class GMM;
 class GMMTrainer {
 	public:
-		virtual void train(GMM *gmm, std::vector<std::vector<real_t>> &X) = 0;
+		virtual void train(GMM *gmm, const std::vector<std::vector<real_t>> &X) = 0;
 		virtual ~GMMTrainer() {}
 };
 
@@ -57,13 +57,13 @@ class GMMTrainerBaseline : public GMMTrainer {
 		GMMTrainerBaseline(int nr_iter = 10, real_t min_covar = 1e-3, real_t threshold = 0.01,
 				int init_with_kmeans = 1, int concurrency = 1,
 				int verbosity = 0);
-		virtual void train(GMM *gmm, std::vector<std::vector<real_t>> &X);
+		virtual void train(GMM *gmm, const std::vector<std::vector<real_t>> &X);
 		void clear_gaussians();
 
 		// init gaussians along with its weight
-		virtual void init_gaussians(std::vector<std::vector<real_t>> &X);
+		virtual void init_gaussians(const std::vector<std::vector<real_t>> &X);
 
-		virtual void iteration(std::vector<std::vector<real_t>> &X);
+		virtual void iteration(const std::vector<std::vector<real_t>> &X);
 
 		int dim;
 
@@ -91,7 +91,7 @@ class GMM {
 		~GMM();
 
 		template<class Instance>
-			void fit(std::vector<Instance> &X) {
+			void fit(const std::vector<Instance> &X) {
 				bool new_trainer = false;
 				if (trainer == NULL) {
 					trainer = new GMMTrainerBaseline();
@@ -114,17 +114,17 @@ class GMM {
 		std::vector<real_t> weights;
 		std::vector<Gaussian *> gaussians;
 
-		real_t log_probability_of(std::vector<real_t> &x);
-		real_t log_probability_of(std::vector<std::vector<real_t>> &X);
+		real_t log_probability_of(const std::vector<real_t> &x);
+		real_t log_probability_of(const std::vector<std::vector<real_t>> &X);
 
-		real_t log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer = NULL);
-		real_t log_probability_of_fast_exp(std::vector<std::vector<real_t>> &X, double *buffer = NULL);
-		real_t log_probability_of_fast_exp_threaded(std::vector<std::vector<real_t>> &X, int concurrency);
-		void log_probability_of_fast_exp_threaded(
+		real_t log_probability_of_fast_exp(const std::vector<real_t> &x, double *buffer = NULL);
+		real_t log_probability_of_fast_exp(const std::vector<std::vector<real_t>> &X, double *buffer = NULL);
+		real_t log_probability_of_fast_exp_threaded(const std::vector<std::vector<real_t>> &X, int concurrency);
+		void log_probability_of_fast_exp_threaded(const 
 				std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency);
 
 
-		real_t probability_of(std::vector<real_t> &x);
+		real_t probability_of(const std::vector<real_t> &x);
 
 		void normalize_weights();
 

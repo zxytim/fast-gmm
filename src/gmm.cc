@@ -62,7 +62,7 @@ vector<real_t> Gaussian::sample() {
 	return x;
 }
 
-real_t Gaussian::log_probability_of(std::vector<real_t> &x) {
+real_t Gaussian::log_probability_of(const std::vector<real_t> &x) {
 	assert((int)x.size() == dim);
 
 	real_t prob = 0;
@@ -136,7 +136,7 @@ void Gaussian::load(std::istream &in) {
 }
 
 // most time consuming function
-real_t Gaussian::probability_of(std::vector<real_t> &x) {
+real_t Gaussian::probability_of(const std::vector<real_t> &x) {
 	assert((int)x.size() == dim);
 
 	real_t prob = 1.0;
@@ -159,7 +159,7 @@ real_t Gaussian::probability_of(std::vector<real_t> &x) {
 	return prob;
 }
 
-real_t Gaussian::probability_of_fast_exp(std::vector<real_t> &x, double *buffer) {
+real_t Gaussian::probability_of_fast_exp(const std::vector<real_t> &x, double *buffer) {
 	assert((int)x.size() == dim);
 
 	real_t prob = 1.0;
@@ -212,7 +212,7 @@ GMM::~GMM() {
 }
 
 
-real_t GMM::log_probability_of(std::vector<real_t> &x) {
+real_t GMM::log_probability_of(const std::vector<real_t> &x) {
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
 		prob += weights[i] * gaussians[i]->probability_of(x);
@@ -220,7 +220,7 @@ real_t GMM::log_probability_of(std::vector<real_t> &x) {
 	return log(prob);
 }
 
-real_t GMM::log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer) {
+real_t GMM::log_probability_of_fast_exp(const std::vector<real_t> &x, double *buffer) {
 
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
@@ -229,7 +229,7 @@ real_t GMM::log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer) 
 	return log(prob);
 }
 
-real_t GMM::probability_of(std::vector<real_t> &x) {
+real_t GMM::probability_of(const std::vector<real_t> &x) {
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
 		prob *= weights[i] * gaussians[i]->probability_of(x);
@@ -238,14 +238,14 @@ real_t GMM::probability_of(std::vector<real_t> &x) {
 }
 
 // time consuming
-real_t GMM::log_probability_of(std::vector<std::vector<real_t>> &X) {
+real_t GMM::log_probability_of(const std::vector<std::vector<real_t>> &X) {
 	real_t prob = 0;
 	for (auto &x: X)
 		prob += log_probability_of(x);
 	return prob;
 }
 
-real_t GMM::log_probability_of_fast_exp(std::vector<std::vector<real_t>> &X, double *buffer) {
+real_t GMM::log_probability_of_fast_exp(const std::vector<std::vector<real_t>> &X, double *buffer) {
 	assert(buffer != NULL);
 	real_t prob = 0;
 	for (auto &x: X)
@@ -337,7 +337,7 @@ static void Dense2Sparse(const std::vector<std::vector<real_t>> &X,
 	}
 }
 
-void GMMTrainerBaseline::init_gaussians(std::vector<std::vector<real_t>> &X) {
+void GMMTrainerBaseline::init_gaussians(const std::vector<std::vector<real_t>> &X) {
 	assert(gmm->covariance_type == COVTYPE_DIAGONAL);
 
 	// calculate data variance
@@ -419,7 +419,7 @@ static void gassian_set_zero(Gaussian *gaussian) {
 
 }
 
-void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
+void GMMTrainerBaseline::iteration(const std::vector<std::vector<real_t>> &X) {
 	int n = (int)X.size();
 
 	bool enable_guarded_timer = verbosity >= 2;
@@ -538,7 +538,7 @@ void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
 
 }
 
-static void threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_buffer, int concurrency) {
+static void threaded_log_probability_of(GMM *gmm, const std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_buffer, int concurrency) {
 	int n = (int)X.size();
 	prob_buffer.resize(n);
 	int batch_size = (int)ceil(n / (real_t)concurrency);
@@ -567,7 +567,7 @@ static void threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t
 	delete [] buffers;
 }
 
-static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, int concurrency) {
+static real_t threaded_log_probability_of(GMM *gmm, const std::vector<std::vector<real_t>> &X, int concurrency) {
 	std::vector<real_t> prob_buffer;
 	threaded_log_probability_of(gmm, X, prob_buffer, concurrency);
 	real_t prob = 0;
@@ -576,17 +576,17 @@ static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real
 	return prob;
 }
 
-real_t GMM::log_probability_of_fast_exp_threaded(std::vector<std::vector<real_t>> &X, int concurrency) {
+real_t GMM::log_probability_of_fast_exp_threaded(const std::vector<std::vector<real_t>> &X, int concurrency) {
 	return threaded_log_probability_of(this, X, concurrency);
 }
 
 void GMM::log_probability_of_fast_exp_threaded(
-		std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency) {
+		const std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency) {
 	threaded_log_probability_of(this, X, prob_out, concurrency);
 }
 
 
-void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
+void GMMTrainerBaseline::train(GMM *gmm, const std::vector<std::vector<real_t>> &X) {
 	if (X.size() == 0) {
 		const char *msg = "X.size() == 0";
 		printf("%s\n", msg);
