@@ -254,7 +254,7 @@ real_t GMM::log_probability_of_fast_exp(const std::vector<real_t> &x, double *bu
 real_t GMM::probability_of(const std::vector<real_t> &x) {
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
-		prob *= weights[i] * gaussians[i]->probability_of(x);
+		prob += weights[i] * gaussians[i]->probability_of(x);
 	}
 	return prob;
 }
@@ -275,7 +275,8 @@ real_t GMM::log_probability_of_fast_exp(const std::vector<std::vector<real_t>> &
 	return prob;
 }
 real_t GMM::mahalanobis_of(const std::vector<real_t> &x) {
-	assert(nr_mixtures==1);
+	if (nr_mixtures != 1)
+		throw "Mahalanobis Distance not implemented for more than one gaussian";
 	return gaussians[0]->mahalanobis_of(x);
 }
 
