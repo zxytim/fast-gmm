@@ -85,6 +85,28 @@ real_t Gaussian::log_probability_of(const std::vector<real_t> &x) {
 	return prob;
 }
 
+real_t Gaussian::mahalanobis_of(const std::vector<real_t> &x) {
+	assert((int)x.size() == dim);
+	real_t prob = 0;
+	switch (covariance_type) {
+		case COVTYPE_SPHERICAL:
+			throw "COVTYPE_SPHERICAL not implemented";
+			break;
+		case COVTYPE_DIAGONAL:
+			for (int i = 0; i < dim; i ++) {
+				real_t &s = sigma[i];
+				real_t s2 = s * s;
+				real_t d = (x[i] - mean[i]);
+				prob += -sqrt(d * d / s2);
+			}
+			break;
+		case COVTYPE_FULL:
+			throw "COVTYPE_FULL not implemented";
+			break;
+	}
+	return prob;
+}
+
 void Gaussian::dump(std::ostream &out) {
 	out << dim << ' ' << covariance_type << endl;
 	for (auto &m: mean) out << m << ' ';
@@ -251,6 +273,10 @@ real_t GMM::log_probability_of_fast_exp(const std::vector<std::vector<real_t>> &
 	for (auto &x: X)
 		prob += log_probability_of_fast_exp(x, buffer);
 	return prob;
+}
+real_t GMM::mahalanobis_of(const std::vector<real_t> &x) {
+	assert(nr_mixtures==1);
+	return gaussians[0]->mahalanobis_of(x);
 }
 
 #if 0

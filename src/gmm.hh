@@ -33,6 +33,7 @@ class Gaussian {
 		real_t log_probability_of(const std::vector<real_t> &x);
 		real_t probability_of(const std::vector<real_t> &x);
 		real_t probability_of_fast_exp(const std::vector<real_t> &x, double *buffer = NULL);
+		real_t mahalanobis_of(const std::vector<real_t> &x);
 
 		// sample a point to @x
 		void sample(std::vector<real_t> &x);
@@ -120,6 +121,7 @@ class GMM {
 		real_t log_probability_of_fast_exp(const std::vector<real_t> &x, double *buffer = NULL);
 		real_t log_probability_of_fast_exp(const std::vector<std::vector<real_t>> &X, double *buffer = NULL);
 		real_t log_probability_of_fast_exp_threaded(const std::vector<std::vector<real_t>> &X, int concurrency);
+		real_t mahalanobis_of(const std::vector<real_t> &x);
 		void log_probability_of_fast_exp_threaded(const 
 				std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency);
 
