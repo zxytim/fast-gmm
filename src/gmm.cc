@@ -83,7 +83,7 @@ real_t Gaussian::log_probability_of(const std::vector<real_t> &x) {
 			std::vector<real_t> x_copy = x;
 			Eigen::VectorXd d = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(x_copy.data(), x_copy.size());
 			d = d-Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(mean.data(), mean.size());
-			prob = -log(std::pow(PI_2,x.size()) * det_covariance) - 0.5f * d.transpose() * inv_covariance * d;
+			prob = -log(sqrt(std::pow(PI_2,x.size()) * det_covariance)) - 0.5f * d.transpose() * inv_covariance * d;
 			break;
 	}
 	return prob;
@@ -189,7 +189,7 @@ real_t Gaussian::probability_of(const std::vector<real_t> &x) {
 			std::vector<real_t> x_copy = x;
 			Eigen::VectorXd d = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(x_copy.data(), x_copy.size());
 			d = d-Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(mean.data(), mean.size());
-			prob =  exp(-0.5f * d.transpose() * inv_covariance * d) / (std::pow(PI_2,x.size()) * det_covariance);
+			prob =  exp(-0.5f * d.transpose() * inv_covariance * d) / sqrt((std::pow(PI_2,x.size()) * det_covariance));
 			break;
 	}
 	return prob;
