@@ -19,6 +19,7 @@ using namespace std;
 using namespace ThreadLib;
 
 static const real_t SQRT_2_PI = 2.5066282746310002;
+static const real_t PI_2 = 6.28318530718;
 
 #include "fastexp.hh"
 
@@ -29,8 +30,8 @@ static const real_t EPS = 2.2204460492503131e-16;
 
 Gaussian::Gaussian(int dim, int covariance_type) :
 	dim(dim), covariance_type(covariance_type) {
-	if (covariance_type != COVTYPE_DIAGONAL) {
-		const char *msg = "only diagonal matrix supported.";
+	if (covariance_type != COVTYPE_DIAGONAL && covariance_type != COVTYPE_FULL) {
+		const char *msg = "covariance type not supported.";
 		printf("%s\n", msg);
 		throw msg;
 	}
@@ -51,7 +52,7 @@ void Gaussian::sample(std::vector<real_t> &x) {
 				x[i] = random.rand_normal(mean[i], sigma[i]);
 			break;
 		case COVTYPE_FULL:
-			throw "COVTYPE_FULL not implemented";
+			throw "no sampling for COVTYPE_FULL implemented";
 			break;
 	}
 }
@@ -62,7 +63,7 @@ vector<real_t> Gaussian::sample() {
 	return x;
 }
 
-real_t Gaussian::log_probability_of(std::vector<real_t> &x) {
+real_t Gaussian::log_probability_of(const std::vector<real_t> &x) {
 	assert((int)x.size() == dim);
 
 	real_t prob = 0;
@@ -79,7 +80,35 @@ real_t Gaussian::log_probability_of(std::vector<real_t> &x) {
 			}
 			break;
 		case COVTYPE_FULL:
-			throw "COVTYPE_FULL not implemented";
+			std::vector<real_t> x_copy = x;
+			Eigen::VectorXd d = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(x_copy.data(), x_copy.size());
+			d = d-Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(mean.data(), mean.size());
+			prob = -log(sqrt(std::pow(PI_2,x.size()) * det_covariance)) - 0.5f * d.transpose() * inv_covariance * d;
+			break;
+	}
+	return prob;
+}
+
+real_t Gaussian::mahalanobis_of(const std::vector<real_t> &x) {
+	assert((int)x.size() == dim);
+	real_t prob = 0;
+	switch (covariance_type) {
+		case COVTYPE_SPHERICAL:
+			throw "COVTYPE_SPHERICAL not implemented";
+			break;
+		case COVTYPE_DIAGONAL:
+			for (int i = 0; i < dim; i ++) {
+				real_t &s = sigma[i];
+				real_t s2 = s * s;
+				real_t d = (x[i] - mean[i]);
+				prob += -sqrt(d * d / s2);
+			}
+			break;
+		case COVTYPE_FULL:
+			std::vector<real_t> x_copy = x;
+			Eigen::VectorXd d = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(x_copy.data(), x_copy.size());
+			d = d-Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(mean.data(), mean.size());
+			prob = sqrt(d.transpose() * inv_covariance * d);
 			break;
 	}
 	return prob;
@@ -100,11 +129,10 @@ void Gaussian::dump(std::ostream &out) {
 			out << endl;
 			break;
 		case COVTYPE_FULL:
-			for (auto &row: covariance) {
-				for (auto &v: row)
-					out << v << ' ';
-				out << endl;
-			}
+			for(int x=0; x<dim; x++)
+				for(int y=0; y<dim; y++)
+					out << covariance(x,y) << ' ';
+			out << endl;
 			break;
 	}
 }
@@ -125,18 +153,23 @@ void Gaussian::load(std::istream &in) {
 			for (auto &s: sigma) in >> s;
 			break;
 		case COVTYPE_FULL:
-			covariance.resize(dim);
-			for (auto &row: covariance) {
-				row.resize(dim);
-				for (auto &v: row)
-					in >> v;
-			}
+			covariance.resize(dim,dim);
+			for(int x=0; x<dim; x++)
+				for(int y=0; y<dim; y++)
+					in >> covariance(x,y);
+			setCovariance(covariance);
 			break;
 	}
 }
 
+void Gaussian::setCovariance(const Eigen::MatrixXd& covariance){
+		this->covariance = covariance;
+		det_covariance = covariance.determinant();
+		inv_covariance = covariance.inverse();
+}
+
 // most time consuming function
-real_t Gaussian::probability_of(std::vector<real_t> &x) {
+real_t Gaussian::probability_of(const std::vector<real_t> &x) {
 	assert((int)x.size() == dim);
 
 	real_t prob = 1.0;
@@ -153,13 +186,16 @@ real_t Gaussian::probability_of(std::vector<real_t> &x) {
 				}
 			break;
 		case COVTYPE_FULL:
-			throw "COVTYPE_FULL not implemented";
+			std::vector<real_t> x_copy = x;
+			Eigen::VectorXd d = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(x_copy.data(), x_copy.size());
+			d = d-Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(mean.data(), mean.size());
+			prob =  exp(-0.5f * d.transpose() * inv_covariance * d) / sqrt((std::pow(PI_2,x.size()) * det_covariance));
 			break;
 	}
 	return prob;
 }
 
-real_t Gaussian::probability_of_fast_exp(std::vector<real_t> &x, double *buffer) {
+real_t Gaussian::probability_of_fast_exp(const std::vector<real_t> &x, double *buffer) {
 	assert((int)x.size() == dim);
 
 	real_t prob = 1.0;
@@ -181,7 +217,7 @@ real_t Gaussian::probability_of_fast_exp(std::vector<real_t> &x, double *buffer)
 			}
 			break;
 		case COVTYPE_FULL:
-			throw "COVTYPE_FULL not implemented";
+			prob = probability_of(x);
 			break;
 	}
 	return prob;
@@ -194,8 +230,8 @@ GMM::GMM(int nr_mixtures, int covariance_type,
 	covariance_type(covariance_type),
 	trainer(trainer) {
 
-	if (covariance_type != COVTYPE_DIAGONAL) {
-		const char *msg = "only diagonal matrix supported.";
+	if (covariance_type != COVTYPE_DIAGONAL && covariance_type != COVTYPE_FULL) {
+		const char *msg = "covariance type not supported.";
 		printf("%s\n", msg);
 		throw msg;
 	}
@@ -212,7 +248,7 @@ GMM::~GMM() {
 }
 
 
-real_t GMM::log_probability_of(std::vector<real_t> &x) {
+real_t GMM::log_probability_of(const std::vector<real_t> &x) {
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
 		prob += weights[i] * gaussians[i]->probability_of(x);
@@ -220,7 +256,7 @@ real_t GMM::log_probability_of(std::vector<real_t> &x) {
 	return log(prob);
 }
 
-real_t GMM::log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer) {
+real_t GMM::log_probability_of_fast_exp(const std::vector<real_t> &x, double *buffer) {
 
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
@@ -229,28 +265,33 @@ real_t GMM::log_probability_of_fast_exp(std::vector<real_t> &x, double *buffer) 
 	return log(prob);
 }
 
-real_t GMM::probability_of(std::vector<real_t> &x) {
+real_t GMM::probability_of(const std::vector<real_t> &x) {
 	real_t prob = 0;
 	for (int i = 0; i < nr_mixtures; i ++) {
-		prob *= weights[i] * gaussians[i]->probability_of(x);
+		prob += weights[i] * gaussians[i]->probability_of(x);
 	}
 	return prob;
 }
 
 // time consuming
-real_t GMM::log_probability_of(std::vector<std::vector<real_t>> &X) {
+real_t GMM::log_probability_of(const std::vector<std::vector<real_t>> &X) {
 	real_t prob = 0;
 	for (auto &x: X)
 		prob += log_probability_of(x);
 	return prob;
 }
 
-real_t GMM::log_probability_of_fast_exp(std::vector<std::vector<real_t>> &X, double *buffer) {
+real_t GMM::log_probability_of_fast_exp(const std::vector<std::vector<real_t>> &X, double *buffer) {
 	assert(buffer != NULL);
 	real_t prob = 0;
 	for (auto &x: X)
 		prob += log_probability_of_fast_exp(x, buffer);
 	return prob;
+}
+real_t GMM::mahalanobis_of(const std::vector<real_t> &x) {
+	if (nr_mixtures != 1)
+		throw "Mahalanobis Distance not implemented for more than one gaussian";
+	return gaussians[0]->mahalanobis_of(x);
 }
 
 #if 0
@@ -337,7 +378,7 @@ static void Dense2Sparse(const std::vector<std::vector<real_t>> &X,
 	}
 }
 
-void GMMTrainerBaseline::init_gaussians(std::vector<std::vector<real_t>> &X) {
+void GMMTrainerBaseline::init_gaussians(const std::vector<std::vector<real_t>> &X) {
 	assert(gmm->covariance_type == COVTYPE_DIAGONAL);
 
 	// calculate data variance
@@ -384,7 +425,20 @@ void GMMTrainerBaseline::init_gaussians(std::vector<std::vector<real_t>> &X) {
 	}
 
 	for (auto &g: gmm->gaussians) {
-		g->sigma = initial_sigma;
+		switch(gmm->covariance_type){
+			case COVTYPE_SPHERICAL:
+				throw "COVTYPE_SPHERICAL not implemented";
+				break;
+			case COVTYPE_DIAGONAL:
+				g->sigma = initial_sigma;
+				break;
+			case COVTYPE_FULL:
+				Eigen::MatrixXd covariance = Eigen::MatrixXd::Identity(g->dim, g->dim);
+				for(unsigned i =0; i<initial_sigma.size(); i++)
+					covariance(i,i) = initial_sigma[i];
+				g->setCovariance(covariance);
+				break;
+		}
 	}
 
 	gmm->weights.resize(gmm->nr_mixtures);
@@ -413,13 +467,10 @@ static void gassian_set_zero(Gaussian *gaussian) {
 		m = 0;
 	for (auto &s: gaussian->sigma)
 		s = 0;
-	for (auto &row: gaussian->covariance)
-		for (auto &v: row)
-			v = 0;
-
+	gaussian->setCovariance(Eigen::MatrixXd::Identity(gaussian->dim, gaussian->dim));
 }
 
-void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
+void GMMTrainerBaseline::iteration(const std::vector<std::vector<real_t>> &X) {
 	int n = (int)X.size();
 
 	bool enable_guarded_timer = verbosity >= 2;
@@ -513,32 +564,67 @@ void GMMTrainerBaseline::iteration(std::vector<std::vector<real_t>> &X) {
 	{
 		GuardedTimer timer("update sigma", enable_guarded_timer);
 		{
-			real_t min_sigma = sqrt(min_covar);
-			Threadpool pool(concurrency);
-			for (int k = 0; k < gmm->nr_mixtures; k ++) {
-				auto task = [&](int k) {
-					vector<real_t> tmp(dim);
-					auto &gaussian = gmm->gaussians[k];
-					for (int i = 0; i < n; i ++) {
-						sub(X[i], gaussian->mean, tmp);
-						for (auto &t: tmp) t = t * t;
-						mult_self(tmp, prob_of_y_given_x[k][i]);
-						add_self(gaussian->sigma, tmp);
+			switch (gmm->covariance_type) {
+				case COVTYPE_SPHERICAL:
+					throw "COVTYPE_SPHERICAL not implemented";
+					break;
+				case COVTYPE_DIAGONAL: {
+					real_t min_sigma = sqrt(min_covar);
+					Threadpool pool(concurrency);
+					for (int k = 0; k < gmm->nr_mixtures; k ++) {
+						auto task = [&](int k) {
+							vector<real_t> tmp(dim);
+							auto &gaussian = gmm->gaussians[k];
+							for (int i = 0; i < n; i ++) {
+								sub(X[i], gaussian->mean, tmp);
+								for (auto &t: tmp) t = t * t;
+								mult_self(tmp, prob_of_y_given_x[k][i]);
+								add_self(gaussian->sigma, tmp);
+							}
+							mult_self(gaussian->sigma, 1.0 / N_k[k]);
+							for (auto &s: gaussian->sigma) {
+								s = sqrt(s);
+								s = max(min_sigma, s);
+							}
+						};
+						pool.enqueue(bind(task, k), 1);
 					}
-					mult_self(gaussian->sigma, 1.0 / N_k[k]);
-					for (auto &s: gaussian->sigma) {
-						s = sqrt(s);
-						s = max(min_sigma, s);
+				}
+				break;
+				case COVTYPE_FULL:{
+					real_t min_sigma = sqrt(min_covar);
+					vector<real_t> cov(dim*dim);
+					Threadpool pool(concurrency);
+					for (int k = 0; k < gmm->nr_mixtures; k ++) {
+						auto task = [&](int k) {
+							vector<real_t> tmp(dim);
+							auto &gaussian = gmm->gaussians[k];
+							for (int datapoint = 0; datapoint < n; datapoint ++) {
+								sub(X[datapoint], gaussian->mean, tmp);
+								vector<real_t> tmp2;
+								for(int i=0;  i<gaussian->dim;i++)
+									for(int j=0; j<gaussian->dim;j++)
+										tmp2.push_back(tmp[i] * tmp[j]);
+								mult_self(tmp2, prob_of_y_given_x[k][datapoint]);
+								add_self(cov, tmp2);
+							}
+							mult_self(cov, 1.0 / N_k[k]);
+							for(int i=0;  i<gaussian->dim;i++)
+								cov[i*(gaussian->dim+1)] = max(cov[i*(gaussian->dim+1)], min_sigma);
+							gaussian->setCovariance(Eigen::Map<Eigen::MatrixXd, Eigen::Unaligned>(cov.data(), gaussian->dim, gaussian->dim));
+
+						};
+						pool.enqueue(bind(task, k), 1);
 					}
-				};
-				pool.enqueue(bind(task, k), 1);
+				break;
+				}
 			}
 		}
 	}
 
 }
 
-static void threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_buffer, int concurrency) {
+static void threaded_log_probability_of(GMM *gmm, const std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_buffer, int concurrency) {
 	int n = (int)X.size();
 	prob_buffer.resize(n);
 	int batch_size = (int)ceil(n / (real_t)concurrency);
@@ -567,7 +653,7 @@ static void threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t
 	delete [] buffers;
 }
 
-static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real_t>> &X, int concurrency) {
+static real_t threaded_log_probability_of(GMM *gmm, const std::vector<std::vector<real_t>> &X, int concurrency) {
 	std::vector<real_t> prob_buffer;
 	threaded_log_probability_of(gmm, X, prob_buffer, concurrency);
 	real_t prob = 0;
@@ -576,17 +662,17 @@ static real_t threaded_log_probability_of(GMM *gmm, std::vector<std::vector<real
 	return prob;
 }
 
-real_t GMM::log_probability_of_fast_exp_threaded(std::vector<std::vector<real_t>> &X, int concurrency) {
+real_t GMM::log_probability_of_fast_exp_threaded(const std::vector<std::vector<real_t>> &X, int concurrency) {
 	return threaded_log_probability_of(this, X, concurrency);
 }
 
 void GMM::log_probability_of_fast_exp_threaded(
-		std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency) {
+		const std::vector<std::vector<real_t>> &X, std::vector<real_t> &prob_out, int concurrency) {
 	threaded_log_probability_of(this, X, prob_out, concurrency);
 }
 
 
-void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
+void GMMTrainerBaseline::train(GMM *gmm, const std::vector<std::vector<real_t>> &X) {
 	if (X.size() == 0) {
 		const char *msg = "X.size() == 0";
 		printf("%s\n", msg);
@@ -652,7 +738,7 @@ void GMMTrainerBaseline::train(GMM *gmm, std::vector<std::vector<real_t>> &X) {
 }
 
 void GMM::dump(ostream &out) {
-	out << nr_mixtures << endl;
+	out << nr_mixtures << ' ' << dim << ' ' << covariance_type << endl;
 	for (auto &w: weights)
 		out << w << ' ';
 	out << endl;
@@ -661,13 +747,13 @@ void GMM::dump(ostream &out) {
 }
 
 void GMM::load(istream &in) {
-	in >> nr_mixtures;
+	in >> nr_mixtures >> dim >> covariance_type;
 	weights.resize(nr_mixtures);
 	for (auto &w: weights)
 		in >> w;
 	gaussians.resize(nr_mixtures);
 	for (auto &g: gaussians) {
-		g = new Gaussian(dim, COVTYPE_DIAGONAL);
+		g = new Gaussian(dim, covariance_type);
 		g->load(in);
 	}
 }

@@ -107,7 +107,7 @@ real_t KMeansppSolver::cluster(const Dataset &dataset, std::vector<Vector> &cent
 	for (auto &p: centroids)
 		p.resize(m);
 
-	printf("kmeans++ initializing ...\n");
+	//printf("kmeans++ initializing ...\n");
 
 	// initial cluster with one random point
 	Instance2Vector(dataset[random.rand_int() % n], centroids[0], m);
@@ -145,7 +145,7 @@ real_t KMeansppSolver::cluster(const Dataset &dataset, std::vector<Vector> &cent
 			random_weight -= distances[i];
 			if (random_weight <= 0) {
 				Instance2Vector(dataset[i], centroids[k], m);
-				printf("kmeans++ iteration %3d: %f, #%d has been choosen\n", k, distsqr_sum, i); fflush(stdout);
+				//printf("kmeans++ iteration %3d: %f, #%d has been choosen\n", k, distsqr_sum, i); fflush(stdout);
 				break;
 			}
 		}
@@ -165,7 +165,7 @@ real_t KMeansppSolver::cluster_weighted(
 	for (auto &p: centroids)
 		p.resize(m);
 
-	printf("kmeans++ initializing ...\n");
+	//printf("kmeans++ initializing ...\n");
 
 	// initial cluster with one random point
 	Instance2Vector(dataset[random.rand_int() % n], centroids[0], m);
@@ -204,7 +204,7 @@ real_t KMeansppSolver::cluster_weighted(
 			random_weight -= distances[i];
 			if (random_weight <= 0) {
 				Instance2Vector(dataset[i], centroids[k], m);
-				printf("kmeans++ iteration %3d: %f, #%d has been choosen\n", k, distsqr_sum, i); fflush(stdout);
+				//printf("kmeans++ iteration %3d: %f, #%d has been choosen\n", k, distsqr_sum, i); fflush(stdout);
 				break;
 			}
 		}
@@ -216,7 +216,7 @@ real_t KMeansppSolver::cluster_weighted(
 real_t KMeansppSolver::cluster_weighted(const std::vector<Vector> &dataset, const std::vector<real_t> &weight,
 		std::vector<Vector> &centroids, int K) {
 	if (dataset.size() == 0) {
-		printf("[WARNING] no data given");
+		//printf("[WARNING] no data given");
 		return 0;
 	}
 	// TODO: not to waste that much memory, write start from scratch

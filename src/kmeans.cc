@@ -149,7 +149,7 @@ using namespace KMeansSolverImpl;
 real_t KMeansSolver::Lloyds_iteration(
 		const Dataset &dataset, std::vector<Vector> &centroids) {
 
-	printf("entering Lloyds_iteration\n"); fflush(stdout);
+	//printf("entering Lloyds_iteration\n"); fflush(stdout);
 
 	Threadpool p(concurrency);
 	int n = dataset.size();
@@ -188,15 +188,15 @@ real_t KMeansSolver::Lloyds_iteration(
 			distsqr_best = distsqr_sum;
 			centroids_best = centroids;
 		}
-		printf("iteration %3d: %f\n", iter_id, distsqr_sum); fflush(stdout);
+		//printf("iteration %3d: %f\n", iter_id, distsqr_sum); fflush(stdout);
 		if (fabs(last_distsqr_sum - distsqr_sum) < 1e-6) { // || fabs(distsqr_sum - last_distsqr_sum) / last_distsqr_sum < 1e-6)
-			printf("distance squared sum not changing, converged.\n");
+			//printf("distance squared sum not changing, converged.\n");
 			break;
 		}
 
 		const real_t terminate_cost_factor = 1.5;
 		if (distsqr_sum > distsqr_best * terminate_cost_factor) {
-			printf("distance square sum %f is worse than best found by a factor of %f. ternimating.\n", distsqr_sum, terminate_cost_factor);
+			//("distance square sum %f is worse than best found by a factor of %f. ternimating.\n", distsqr_sum, terminate_cost_factor);
 			break;
 		}
 
@@ -233,12 +233,12 @@ real_t KMeansSolver::Lloyds_iteration(
 		last_distsqr_sum = distsqr_sum;
 
 		if (iter_id == n_iter_max - 1) {
-			printf("max number of iterations(%d) reached, quit iteration\n", n_iter_max); fflush(stdout);
+			//printf("max number of iterations(%d) reached, quit iteration\n", n_iter_max); fflush(stdout);
 		}
 	}
 
 	centroids = centroids_best;
-	printf("minimum distance squared sum(Lloyds_iteration): %f\n", distsqr_best); fflush(stdout);
+	//printf("minimum distance squared sum(Lloyds_iteration): %f\n", distsqr_best); fflush(stdout);
 
 	return distsqr_best;
 }
@@ -248,7 +248,7 @@ real_t KMeansSolver::Lloyds_iteration_weighted(
 		const Dataset &dataset, const std::vector<real_t> &weight,
 		std::vector<Vector> &centroids) {
 
-	printf("entering Lloyds_iteration_weighted\n"); fflush(stdout);
+	//printf("entering Lloyds_iteration_weighted\n"); fflush(stdout);
 
 	Threadpool p(concurrency);
 	int n = dataset.size();
@@ -293,7 +293,7 @@ real_t KMeansSolver::Lloyds_iteration_weighted(
 			centroids_best = centroids;
 		}
 
-		printf("iteration %3d: %f\n", iter_id, distsqr_sum); fflush(stdout);
+		//printf("iteration %3d: %f\n", iter_id, distsqr_sum); fflush(stdout);
 		if (fabs(last_distsqr_sum - distsqr_sum) < 1e-6)// || fabs(distsqr_sum - last_distsqr_sum) / last_distsqr_sum < 1e-6)
 			break;
 
@@ -329,12 +329,12 @@ real_t KMeansSolver::Lloyds_iteration_weighted(
 		last_distsqr_sum = distsqr_sum;
 
 		if (iter_id == n_iter_max - 1) {
-			printf("max number of iterations(%d) reached, quit iteration\n", n_iter_max); fflush(stdout);
+			//printf("max number of iterations(%d) reached, quit iteration\n", n_iter_max); fflush(stdout);
 		}
 	}
 
 	centroids = centroids_best;
-	printf("minimum distance squared sum(Lloyds_iteration_weighted): %f\n", distsqr_best); fflush(stdout);
+	//printf("minimum distance squared sum(Lloyds_iteration_weighted): %f\n", distsqr_best); fflush(stdout);
 	return distsqr_best;
 }
 
